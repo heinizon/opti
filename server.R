@@ -21,25 +21,28 @@ install_load <- function (package1, ...)
 
 install_load('shiny', 'xlsx', 'ggplot2', 'scales', 'dplyr')
 
-shinyServer(function(input, output) {
+shinyServer(function(input, output, session) {
   
-  output$data <- renderTable({
+  # dynamic variable names
+  observe({
     
     infile <- input$datfile
-    dat <- read.csv(infile$datapath, header = T)
     
-    if(is.null(infile)) {
-      dat <- data.frame(
-            Line.Item = c('Line Item A','Line Item B','Line Item C'), 
-            Media.Cost = c('$2589.14','$2177.04','$2165.78'),
-            Total.Conversions = c(126, 107, 111))
-      dat
-    }
-
-    dat
+    print(infile)
+    if(is.null(infile))
+      return(NULL)
     
-  }) 
+    dt = read.csv(infile$datapath, header = T)
+    
+    ## Decide later what to do with the data, here we just fill
+    updateSelectInput(session, 'dimension', choices = names(dt))
+    updateSelectInput(session, 'conversions', choices = names(dt))
+    updateSelectInput(session, 'spend', choices = names(dt))
   
+  })
+  
+  # upload tab
+  # data status
   output$data_status <- renderText({
     
     infile <- input$datfile
@@ -50,41 +53,79 @@ shinyServer(function(input, output) {
       
     } else paste('Data successfully uploaded')
     
-  })
+  }) # end data status
   
+  # data tab
+  # read in data
+  output$data <- renderTable({
+    
+    infile <- input$datfile    
+    
+    if(is.null(infile)){
+      
+      return(NULL)
+      
+    } else
+      
+      read.csv(infile$datapath, header = T)
+    
+  }) # end data tab
+  
+  # analysis tab
+  # running the optimization analysis
   output$analysis <- renderTable({
+  
+    infile <- input$datfile
+    dat <- read.csv(infile$datapath, header = T)
+    
+    if(is.null(infile)){
+      
+      return()
+      
+    } else {
+    
+    goal_cpa <- as.numeric(input$goal)
+    
+    spend <- dat[ , input$spend]
+    conversions <- dat[ , input$conversions]
+    dimension <- dat[ , input$dimension]
+    
+    cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
+    numerator <- (1/cpa) - (1/goal_cpa)
+    denominator <- sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)
+    z <- numerator/denominator
+    classification <- ifelse(pnorm(z) < .05, 'Cut', 'OK')
+    
+    dat <- data.frame(dimension, conversions, spend, cpa, classification) %.%
+      arrange(classification, cpa)
+    
+    return(dat)
+    
+    }
+        
+  }) # end optimization analysis
+
+  # analysis tab
+  # calculate average cpa
+  output$average_cpa <- renderText({
     
     infile <- input$datfile
     dat <- read.csv(infile$datapath, header = T)
     
-    if (is.null(infile)) {
-      
-      dat <- data.frame(
-        Line.Item = c('Line Item A','Line Item B','Line Item C'), 
-        Media.Cost = c('$2589.14','$2177.04','$2165.78'),
-        Total.Conversions = c(126, 107, 111))
-      dat
+    if(is.null(infile)) {
+    
+      return(paste('No data set has been uploaded'))  
       
     } else {
       
-      goal_cpa <- as.numeric(input$goal)
+      spnd <- dat[ , input$spend]
+      conv <- dat[ , input$conversions]
       
-      dat %.%
-        transform(cpa = ifelse(Total.Conversions == 0,
-                               max(Media.Cost),
-                               Media.Cost/Total.Conversions)) %.%
-        transform(numerator = (1/cpa) - (1/goal_cpa),
-                  denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/Media.Cost)) %.%
-        transform(z = numerator/denominator) %.%
-        transform(classification = ifelse(pnorm(z) < .05, 'Cut', 'OK')) %.%
-        select(Line.Item, classification, cpa) %.%
-        arrange(classification, cpa)
-      
+      average_cpa <- sum(spnd) / sum(conv)
+      paste('Average CPA:', dollar(average_cpa))
+    
     }
     
   })
-        
-}) # end ShinyServer I/O
-
-
-
+  
+}) # end ShinyServer

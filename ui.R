@@ -24,12 +24,15 @@ install_load('shiny')
 
 shinyUI(pageWithSidebar(
   
-  # Application title
+  # app title
   headerPanel('Optimization Reporting'),
   
-  # Goal input
+  # goal input
   sidebarPanel(
-    h3(textInput('goal', 'Please enter the goal CPA: ', '50'))
+    h3(textInput('goal', 'Please enter the goal CPA: ', '50')),
+    selectInput('dimension', 'Dimension:' ,'Dimension'),
+    selectInput('conversions', 'Conversions:', 'Conversions'),
+    selectInput('spend', 'Spend:', 'Spend')
   ),
   
   mainPanel(
@@ -38,14 +41,12 @@ shinyUI(pageWithSidebar(
       
       tabPanel('Upload', 
                h3(textOutput('data_status')),
-               fileInput('datfile', '')
-      ),
-      
-      tabPanel('Data',
+               fileInput('datfile', ''),
                tableOutput('data')
       ),
       
       tabPanel('Analysis',
+               h3(textOutput('average_cpa')),
                tableOutput('analysis')
       )
       
