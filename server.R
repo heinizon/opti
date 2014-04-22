@@ -19,7 +19,8 @@ install_load <- function (package1, ...)
   
 }
 
-install_load('shiny', 'xlsx', 'ggplot2', 'scales', 'dplyr')
+install_load('shiny', 'gdata', 'ggplot2', 
+             'scales', 'dplyr', 'rCharts')
 
 shinyServer(function(input, output, session) {
   
@@ -32,7 +33,7 @@ shinyServer(function(input, output, session) {
     if(is.null(infile))
       return(NULL)
     
-    dt = read.csv(infile$datapath, header = T)
+    dt <- read.csv(infile$datapath, header = T)
     
     ## Decide later what to do with the data, here we just fill
     updateSelectInput(session, 'dimension', choices = names(dt))
@@ -80,15 +81,15 @@ shinyServer(function(input, output, session) {
     
     if(is.null(infile)){
       
-      return()
+      return(NULL)
       
     } else {
     
     goal_cpa <- as.numeric(input$goal)
     
-    spend <- dat[ , input$spend]
-    conversions <- dat[ , input$conversions]
-    dimension <- dat[ , input$dimension]
+    spend <- dat[, input$spend]
+    conversions <- dat[, input$conversions]
+    dimension <- dat[, input$dimension]
     
     cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
     numerator <- (1/cpa) - (1/goal_cpa)
@@ -96,10 +97,31 @@ shinyServer(function(input, output, session) {
     z <- numerator/denominator
     classification <- ifelse(pnorm(z) < .05, 'Cut', 'OK')
     
-    dat <- data.frame(dimension, conversions, spend, cpa, classification) %.%
-      arrange(classification, cpa)
+    dat <- data.frame(spend = dat[, input$spend],
+                      conversions = dat[, input$conversions],
+                      dimension = dat[, input$dimension]) %.%
+      transform(cpa = 
+                  ifelse(conversions == 0, max(spend), spend/conversions)) %.%
+      transform(numerator = (1/cpa) - (1/goal_cpa),
+                denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
+      transform(z = numerator/denominator) %.%
+      transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
+      group_by(classification) %.%
+      dplyr::summarise(spend = sum(spend),
+                       conversions = sum(conversions)) %.%
+      transform(cpa = spend/conversions)
     
-    return(dat)
+    ok_avg <- dat$cpa[2]
+    
+    dat <- data.frame(dimension, conversions, spend, 
+                      cpa, classification) %.%
+      mutate(classification = ifelse(cpa < ok_avg,
+                                     'Break Out',
+                                     paste(classification))) %.%
+      arrange(classification, cpa) %.%
+      rename.vars(c('dimension', 'conversions', 'spend'),
+                  c(input$dimension, input$conversions, input$spend)) %.%
+      return()
     
     }
         
@@ -125,6 +147,66 @@ shinyServer(function(input, output, session) {
       paste('Average CPA:', dollar(average_cpa))
     
     }
+    
+  })
+  
+  # summary tab
+  # calculate summary
+  output$classification_summary <- renderTable({
+    
+    infile <- input$datfile
+    dat <- read.csv(infile$datapath, header = T)
+    
+    if(is.null(infile)){
+      
+      return(NULL)
+      
+    } else {
+      
+      goal_cpa <- as.numeric(input$goal)
+      
+      dat <- data.frame(spend = dat[, input$spend],
+                       conversions = dat[, input$conversions],
+                       dimension = dat[, input$dimension]) %.%
+        transform(cpa = 
+                    ifelse(conversions == 0, max(spend), spend/conversions)) %.%
+        transform(numerator = (1/cpa) - (1/goal_cpa),
+                  denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
+        transform(z = numerator/denominator) %.%
+        transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
+        group_by(classification) %.%
+        dplyr::summarise(spend = sum(spend),
+                         conversions = sum(conversions)) %.%
+        transform(cpa = spend/conversions) %.%
+        return()
+      
+    }
+    
+  })
+  
+  # chart tab
+  output$chart1 <- renderChart({
+    
+    infile <- input$datfile
+    dat <- read.csv(infile$datapath, header = T)
+    
+    if(is.null(infile))
+      return(NULL)
+    
+    spnd <- dat[, input$spend]
+    conv <- dat[, input$conversions]
+          
+    datt <- data.frame(spend = dat[, input$spend],
+                       conversions = dat[, input$conversions])
+    
+    p1 <- rPlot(x = 'spend', y = 'conversions', data = datt, type = 'point')
+    
+    p1$addParams(height = 400, width = 700, dom = 'chart1')
+    
+    p1$guides(x = list(title = input$spend))
+    p1$guides(y = list(title = input$conversions))
+    
+    return(p1)
     
   })
   

@@ -20,7 +20,7 @@ install_load <- function (package1, ...)
 }
 
 
-install_load('shiny')
+install_load('shiny', 'rCharts')
 
 shinyUI(pageWithSidebar(
   
@@ -29,7 +29,7 @@ shinyUI(pageWithSidebar(
   
   # goal input
   sidebarPanel(
-    h3(textInput('goal', 'Please enter the goal CPA: ', '50')),
+    h3(textInput('goal', 'Please enter the goal CPA: ', '')),
     selectInput('dimension', 'Dimension:' ,'Dimension'),
     selectInput('conversions', 'Conversions:', 'Conversions'),
     selectInput('spend', 'Spend:', 'Spend')
@@ -48,6 +48,14 @@ shinyUI(pageWithSidebar(
       tabPanel('Analysis',
                h3(textOutput('average_cpa')),
                tableOutput('analysis')
+      ),
+      
+      tabPanel('Summary',
+               tableOutput('classification_summary')
+      ),
+      
+      tabPanel('Chart',
+               showOutput("chart1", "polycharts")
       )
       
     ) # end tabSetPanel
