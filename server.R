@@ -85,44 +85,30 @@ shinyServer(function(input, output, session) {
       
     } else {
     
-    goal_cpa <- as.numeric(input$goal)
-    
-    spend <- dat[, input$spend]
-    conversions <- dat[, input$conversions]
-    dimension <- dat[, input$dimension]
-    
-    cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
-    numerator <- (1/cpa) - (1/goal_cpa)
-    denominator <- sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)
-    z <- numerator/denominator
-    classification <- ifelse(pnorm(z) < .05, 'Cut', 'OK')
-    
-    dat <- data.frame(spend = dat[, input$spend],
-                      conversions = dat[, input$conversions],
-                      dimension = dat[, input$dimension]) %.%
-      transform(cpa = 
-                  ifelse(conversions == 0, max(spend), spend/conversions)) %.%
-      transform(numerator = (1/cpa) - (1/goal_cpa),
-                denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
-      transform(z = numerator/denominator) %.%
-      transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
-      group_by(classification) %.%
-      dplyr::summarise(spend = sum(spend),
-                       conversions = sum(conversions)) %.%
-      transform(cpa = spend/conversions)
-    
-    ok_avg <- dat$cpa[2]
-    
-    dat <- data.frame(dimension, conversions, spend, 
-                      cpa, classification) %.%
-      mutate(classification = ifelse(cpa < ok_avg,
-                                     'Break Out',
-                                     paste(classification))) %.%
-      arrange(classification, cpa) %.%
-      rename.vars(c('dimension', 'conversions', 'spend'),
-                  c(input$dimension, input$conversions, input$spend)) %.%
-      return()
-    
+      goal_cpa <- as.numeric(input$goal)
+      
+      spend <- dat[, input$spend]
+      conversions <- dat[, input$conversions]
+      dimension <- dat[, input$dimension]
+      cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
+      
+      dat <- data.frame(spend = dat[, input$spend],
+                        conversions = dat[, input$conversions],
+                        dimension = dat[, input$dimension],
+                        cpa = cpa) %.%
+        transform(numerator = (1/cpa) - (1/goal_cpa),
+                  denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
+        transform(z = numerator/denominator) %.%
+        transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
+        group_by(classification) %.%
+        transform(cpa = spend/conversions) %.%
+        select(dimension, conversions, spend, cpa, classification) %.%
+        arrange(classification, cpa) %.%
+        rename.vars(c('dimension', 'conversions', 'spend', 
+                      'cpa', 'classification'),
+                    c(input$dimension, input$conversions, input$spend, 
+                      'CPA', 'Classification')) %.%
+        return()
     }
         
   }) # end optimization analysis
