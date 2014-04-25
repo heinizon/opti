@@ -47,6 +47,7 @@ shinyUI(pageWithSidebar(
       
       tabPanel('Analysis',
                h3(textOutput('average_cpa')),
+               downloadButton('downloadAnalysis', "Download Analysis"),
                tableOutput('analysis')
       ),
       

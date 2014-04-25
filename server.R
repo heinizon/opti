@@ -85,30 +85,30 @@ shinyServer(function(input, output, session) {
       
     } else {
     
-      goal_cpa <- as.numeric(input$goal)
-      
-      spend <- dat[, input$spend]
-      conversions <- dat[, input$conversions]
-      dimension <- dat[, input$dimension]
-      cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
-      
-      dat <- data.frame(spend = dat[, input$spend],
-                        conversions = dat[, input$conversions],
-                        dimension = dat[, input$dimension],
-                        cpa = cpa) %.%
-        transform(numerator = (1/cpa) - (1/goal_cpa),
-                  denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
-        transform(z = numerator/denominator) %.%
-        transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
-        group_by(classification) %.%
-        transform(cpa = spend/conversions) %.%
-        select(dimension, conversions, spend, cpa, classification) %.%
-        arrange(classification, cpa) %.%
-        rename.vars(c('dimension', 'conversions', 'spend', 
-                      'cpa', 'classification'),
-                    c(input$dimension, input$conversions, input$spend, 
-                      'CPA', 'Classification')) %.%
-        return()
+#       goal_cpa <- as.numeric(input$goal)
+#       
+#       spend <- dat[, input$spend]
+#       conversions <- dat[, input$conversions]
+#       dimension <- dat[, input$dimension]
+#       cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
+#       
+#       dat <- data.frame(spend = dat[, input$spend],
+#                         conversions = dat[, input$conversions],
+#                         dimension = dat[, input$dimension],
+#                         cpa = cpa) %.%
+#         transform(numerator = (1/cpa) - (1/goal_cpa),
+#                   denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
+#         transform(z = numerator/denominator) %.%
+#         transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
+#         group_by(classification) %.%
+#         transform(cpa = spend/conversions) %.%
+#         select(dimension, conversions, spend, cpa, classification) %.%
+#         arrange(classification, cpa) %.%
+#         rename.vars(c('dimension', 'conversions', 'spend', 
+#                       'cpa', 'classification'),
+#                     c(input$dimension, input$conversions, input$spend, 
+#                       'CPA', 'Classification')) %.%
+        return(Create_Categorization(dat))
     }
         
   }) # end optimization analysis
@@ -195,5 +195,48 @@ shinyServer(function(input, output, session) {
     return(p1)
     
   })
-  
+
+  output$downloadAnalysis <- downloadHandler(
+    filename = function(){
+      paste("testfile.csv")
+    },
+    content = function(file) { 
+      infile <- input$datfile
+      dat <- read.csv(infile$datapath, header = T)
+      
+      if(is.null(infile))
+        return(NULL)
+      write.csv(Create_Categorization(dat), file)
+    }
+  )
+
+
+  Create_Categorization <- function(dat) {
+    goal_cpa <- as.numeric(input$goal)
+    
+    spend <- dat[, input$spend]
+    conversions <- dat[, input$conversions]
+    dimension <- dat[, input$dimension]
+    cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
+    
+    dat <- data.frame(spend = dat[, input$spend],
+                      conversions = dat[, input$conversions],
+                      dimension = dat[, input$dimension],
+                      cpa = cpa) %.%
+      transform(numerator = (1/cpa) - (1/goal_cpa),
+                denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
+      transform(z = numerator/denominator) %.%
+      transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
+      group_by(classification) %.%
+      transform(cpa = spend/conversions) %.%
+      select(dimension, conversions, spend, cpa, classification) %.%
+      arrange(classification, cpa) %.%
+      rename.vars(c('dimension', 'conversions', 'spend', 
+                    'cpa', 'classification'),
+                  c(input$dimension, input$conversions, input$spend, 
+                    'CPA', 'Classification'))
+  }  
+
 }) # end ShinyServer
+
+
