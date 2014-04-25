@@ -84,31 +84,8 @@ shinyServer(function(input, output, session) {
       return(NULL)
       
     } else {
-    
-#       goal_cpa <- as.numeric(input$goal)
-#       
-#       spend <- dat[, input$spend]
-#       conversions <- dat[, input$conversions]
-#       dimension <- dat[, input$dimension]
-#       cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
-#       
-#       dat <- data.frame(spend = dat[, input$spend],
-#                         conversions = dat[, input$conversions],
-#                         dimension = dat[, input$dimension],
-#                         cpa = cpa) %.%
-#         transform(numerator = (1/cpa) - (1/goal_cpa),
-#                   denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
-#         transform(z = numerator/denominator) %.%
-#         transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
-#         group_by(classification) %.%
-#         transform(cpa = spend/conversions) %.%
-#         select(dimension, conversions, spend, cpa, classification) %.%
-#         arrange(classification, cpa) %.%
-#         rename.vars(c('dimension', 'conversions', 'spend', 
-#                       'cpa', 'classification'),
-#                     c(input$dimension, input$conversions, input$spend, 
-#                       'CPA', 'Classification')) %.%
-        return(Create_Categorization(dat))
+        return(Create_Categorization(dat)) #Create_Categorization is a function that returns a dataframe containing
+                                          #a classification of Cut, OK, or BreakOut for each row
     }
         
   }) # end optimization analysis
@@ -196,6 +173,9 @@ shinyServer(function(input, output, session) {
     
   })
 
+  #downloadAnalysis
+  #Outputs a csv file when a user hits the Download Analysis button
+  #file contains the categories from Create_Categorization function
   output$downloadAnalysis <- downloadHandler(
     filename = function(){
       paste("testfile.csv")
@@ -208,9 +188,12 @@ shinyServer(function(input, output, session) {
         return(NULL)
       write.csv(Create_Categorization(dat), file)
     }
-  )
+  )#End of downloadAnalysis
 
 
+  #Create_Categorization
+  #Output:  Dataframe containing the classification (OK, Cut, BreakOut) for each row
+  #input:  Uploaded data stored as variable 'dat'
   Create_Categorization <- function(dat) {
     goal_cpa <- as.numeric(input$goal)
     
@@ -235,7 +218,7 @@ shinyServer(function(input, output, session) {
                     'cpa', 'classification'),
                   c(input$dimension, input$conversions, input$spend, 
                     'CPA', 'Classification'))
-  }  
+  } #End Create_Categorization
 
 }) # end ShinyServer
 
