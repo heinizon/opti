@@ -106,18 +106,9 @@ shinyServer(function(input, output, session) {
       
     } else {
       
-      goal_cpa <- as.numeric(input$goal)
+    dat2 <- categorize(dat)      
       
-      dat <- data.frame(spend = dat[, input$spend],
-                       conversions = dat[, input$conversions],
-                       dimension = dat[, input$dimension]) %.%
-        transform(cpa = 
-                    ifelse(conversions == 0, max(spend), spend/conversions)) %.%
-        transform(numerator = (1/cpa) - (1/goal_cpa),
-                  denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
-        transform(z = numerator/denominator) %.%
-        transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
-        group_by(classification) %.%
+        dat2 <- group_by(dat2, classification) %.%
         dplyr::summarise(spend = sum(spend),
                          conversions = sum(conversions)) %.%
         transform(cpa = spend/conversions) %.%
