@@ -32,7 +32,8 @@ shinyUI(pageWithSidebar(
     h3(textInput('goal', 'Please enter the goal CPA: ', '')),
     selectInput('dimension', 'Dimension:' ,'Dimension'),
     selectInput('conversions', 'Conversions:', 'Conversions'),
-    selectInput('spend', 'Spend:', 'Spend')
+    selectInput('spend', 'Spend:', 'Spend'),
+    downloadButton('downloadAnalysis', "Download Analysis")
   ),
   
   mainPanel(
@@ -46,8 +47,6 @@ shinyUI(pageWithSidebar(
       ),
       
       tabPanel('Analysis',
-               h3(textOutput('average_cpa')),
-               downloadButton('downloadAnalysis', "Download Analysis"),
                tableOutput('analysis')
       ),
       
@@ -55,8 +54,12 @@ shinyUI(pageWithSidebar(
                tableOutput('classification_summary')
       ),
       
-      tabPanel('Chart',
-               showOutput("chart1", "polycharts")
+      tabPanel('Conversions Chart',
+               showOutput("conv_chart", "Highcharts")
+      ),
+      
+      tabPanel('Spend Chart',
+               showOutput("spend_chart", "Highcharts")
       )
       
     ) # end tabSetPanel
