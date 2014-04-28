@@ -60,7 +60,11 @@ shinyUI(pageWithSidebar(
       
       tabPanel('Spend Chart',
                showOutput("spend_chart", "Highcharts")
-      )
+      ),
+      
+      tabPanel('CPA Range Chart',
+               showOutput("cpa_range_chart", "Highcharts")
+      )         
       
     ) # end tabSetPanel
     

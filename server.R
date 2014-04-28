@@ -21,7 +21,7 @@ install_load <- function (package1, ...)
 
 install_load('shiny', 'gdata', 'ggplot2', 
              'scales', 'dplyr', 'rCharts',
-             'XLConnect', 'plyr')
+             'XLConnect', 'reshape2')
 
 shinyServer(function(input, output, session) {
   
@@ -158,6 +158,8 @@ shinyServer(function(input, output, session) {
         
         XLConnect::createSheet(wb, name = 'Summary')
         XLConnect::writeWorksheet(wb, cpa_summary(dat), sheet = 'Summary')
+        XLConnect::setColumnWidth(wb, sheet = 'summary', 
+                                  column = 1:length(cpa_summary(dat)), width = -1)
        
         for(i in 1:length(listData))
           assign(names(listData)[i], listData[[i]])
@@ -398,6 +400,72 @@ shinyServer(function(input, output, session) {
     spendChart$addParams(dom = 'spend_chart')
     spendChart$plotOptions(series = list(stacking = 'normal'))
     return(spendChart)
+    
+  }) # end of spend chart
+  
+  # spend chart
+  output$cpa_range_chart <- renderChart({
+    
+    infile <- input$datfile
+    dat <- read.csv(infile$datapath, header = T)
+    
+    if(is.null(infile))
+      return(NULL)
+    
+    goal_cpa <- as.numeric(input$goal)
+    
+    spend <- dat[, input$spend]
+    conversions <- dat[, input$conversions]
+    dimension <- dat[, input$dimension]
+    cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
+    
+    df <- data.frame()
+    for(i in 1:(goal_cpa + 100)) {
+      
+      dat <- data.frame(dimension = dimension,
+                        conversions = conversions,
+                        spend = spend,
+                        cpa = cpa) %.%
+        transform(cpa = 
+                    ifelse(conversions == 0, 
+                           max(spend), 
+                           spend/conversions)) %.%
+        transform(numerator = (1/cpa) - (1/i),
+                  denominator = sqrt((1/i)*(1-(1/i))/spend)) %.%
+        transform(z = numerator/denominator) %.%
+        transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
+        group_by(classification) %.%
+        dplyr::summarise(spend = sum(spend),
+                         conversions = sum(conversions)) %.%
+        transform(cpa = spend/conversions) %.%
+        mutate(goal_cpa = rep(i, 2))
+      
+      df <- rbind(df, dat)
+    }
+    
+    df2 <- select(df, classification, spend, goal_cpa)
+    df2 <- dcast(df2, goal_cpa ~ classification, value.var = 'spend')
+    row.names(df2) <- df2$goal_cpa
+    df2$goal_cpa <- NULL
+    
+    # highcharts
+    cpa_range_chart <- Highcharts$new()
+    cpa_range_chart$chart(type = 'area')
+    cpa_range_chart$yAxis(title = list(text = input$spend))
+    cpa_range_chart$xAxis(title = list(text = input$conversions),
+                          plotLines = list(list(color = 'red',
+                                                        value = goal_cpa,
+                                                        width = 3,
+                                                        dashStyle = 'longdash')))
+    cpa_range_chart$data(df2)
+    cpa_range_chart$plotOptions(area = list(stacking = 'normal',
+                              marker = list(enabled = F)))
+    cpa_range_chart$addParams(dom = 'cpa_range_chart')
+    cpa_range_chart$tooltip(shared = T,
+                            valuePrefix = '$',
+                            valueDecimals = 0)
+    return(cpa_range_chart)
+
     
   }) # end of spend chart
   
