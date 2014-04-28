@@ -194,18 +194,30 @@ shinyServer(function(input, output, session) {
                       conversions = dat[, input$conversions],
                       dimension = dat[, input$dimension],
                       cpa = cpa) %.%
-      transform(numerator = (1/cpa) - (1/goal_cpa),
-                denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
-      transform(z = numerator/denominator) %.%
-      transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
-      group_by(classification) %.%
+    transform(numerator = (1/cpa) - (1/goal_cpa),
+              denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
+    transform(z = numerator/denominator) %.%
+    transform(classification_cut = ifelse(pnorm(z) < 0.05, 'Cut', 'OK'))
+    
+    ok_dat <- filter(dat, classification_cut == "OK") %.%
+      group_by(classification_cut) %.%
+      summarise(spend=sum(spend), conv=sum(conversions))
+    ok_cpa <- as.numeric(ok_dat$spend[1] / ok_dat$conv[1])
+    print(ok_cpa)
+    
+    dat <- transform(dat, numerator_bo = (1/cpa) - (1/ok_cpa),
+                     denominator_bo = sqrt((1/ok_cpa)*(1-(1/ok_cpa))/spend)) %.%
+      transform(z_bo = numerator_bo / denominator_bo) %.%
+      transform(classification_bo = ifelse(1 - pnorm(z_bo) < .05, "Break Out", "OK")) %.%
+      transform(classification = ifelse(classification_cut == "OK", ifelse(classification_bo == "OK", "OK", "Break Out"), "Cut"))
+    
+    
+
+      dat <- group_by(dat, classification) %.%
       transform(cpa = spend/conversions) %.%
       select(dimension, conversions, spend, cpa, classification) %.%
-      arrange(classification, cpa) %.%
-      rename.vars(c('dimension', 'conversions', 'spend', 
-                    'cpa', 'classification'),
-                  c(input$dimension, input$conversions, input$spend, 
-                    'CPA', 'Classification'))
+      arrange(classification, cpa)
+#       
   } # end categorize
   
   # summary tab for exported data
