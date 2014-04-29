@@ -19,7 +19,7 @@ install_load <- function (package1, ...)
   
 }
 
-
+#
 install_load('shiny', 'rCharts')
 
 shinyUI(pageWithSidebar(
