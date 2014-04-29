@@ -33,6 +33,7 @@ shinyUI(pageWithSidebar(
     selectInput('dimension', 'Dimension:' ,'Dimension'),
     selectInput('conversions', 'Conversions:', 'Conversions'),
     selectInput('spend', 'Spend:', 'Spend'),
+    HTML('<br>'),
     downloadButton('downloadAnalysis', "Download Analysis")
   ),
   
@@ -51,21 +52,15 @@ shinyUI(pageWithSidebar(
       ),
       
       tabPanel('Summary',
+               showOutput("cpa_range_chart", "Highcharts"),
                tableOutput('classification_summary')
       ),
       
-      tabPanel('Conversions Chart',
+      tabPanel('Spend & Conv Chart',
+               showOutput("spend_chart", "Highcharts"),
                showOutput("conv_chart", "Highcharts")
-      ),
-      
-      tabPanel('Spend Chart',
-               showOutput("spend_chart", "Highcharts")
-      ),
-      
-      tabPanel('CPA Range Chart',
-               showOutput("cpa_range_chart", "Highcharts")
-      )         
-      
+      )
+    
     ) # end tabSetPanel
     
   )  #end mainPanel
