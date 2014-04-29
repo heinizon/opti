@@ -433,24 +433,24 @@ shinyServer(function(input, output, session) {
     df <- data.frame()
     
     for(i in 1:(goal_cpa + 100)) {
-#         dat2 <- categorize_cpa.chart(dat, goal_cpa) %.%
-      dat2 <- data.frame(dimension = dimension,
-                        conversions = conversions,
-                        spend = spend,
-                        cpa = cpa) %.%
-        transform(cpa = 
-                    ifelse(conversions == 0, 
-                           max(spend), 
-                           spend/conversions)) %.%
-        transform(numerator = (1/cpa) - (1/i),
-                  denominator = sqrt((1/i)*(1-(1/i))/spend)) %.%
-        transform(z = numerator/denominator) %.%
-        transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
+       dat2 <- categorize_cpa.chart(dat, i) %.%
+#       dat2 <- data.frame(dimension = dimension,
+#                         conversions = conversions,
+#                         spend = spend,
+#                         cpa = cpa) %.%
+#         transform(cpa = 
+#                     ifelse(conversions == 0, 
+#                            max(spend), 
+#                            spend/conversions)) %.%
+#         transform(numerator = (1/cpa) - (1/i),
+#                   denominator = sqrt((1/i)*(1-(1/i))/spend)) %.%
+#         transform(z = numerator/denominator) %.%
+#         transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
         group_by(classification) %.%
         dplyr::summarise(spend = sum(spend),
                          conversions = sum(conversions)) %.%
         transform(cpa = spend/conversions) %.%
-        mutate(goal_cpa = rep(i, 2))
+        dplyr::mutate(goal_cpa = rep(i, n()))
 
       df <- rbind(df, dat2)
     }
