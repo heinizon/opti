@@ -34,12 +34,11 @@ shinyServer(function(input, output, session) {
     if(is.null(infile))
       return(NULL)
     
-    dt <- read.csv(infile$datapath, header = T)
+    d <- read.csv(infile$datapath, header = T)
     
-    ## Decide later what to do with the data, here we just fill
-    updateSelectInput(session, 'dimension', choices = names(dt))
-    updateSelectInput(session, 'conversions', choices = names(dt))
-    updateSelectInput(session, 'spend', choices = names(dt))
+    updateSelectInput(session, 'dimension', choices = names(d))
+    updateSelectInput(session, 'conversions', choices = names(d))
+    updateSelectInput(session, 'spend', choices = names(d))
   
   })
   
@@ -53,7 +52,7 @@ shinyServer(function(input, output, session) {
       
       return(paste('No data set has been uploaded'))
       
-    } else paste('Data successfully uploaded')
+    } else paste('Data successfully uploaded!')
     
   }) # end data status
   
@@ -88,7 +87,8 @@ shinyServer(function(input, output, session) {
       # categorize is a function that returns a dataframe containing
       # a classification of Under Performing, Within Range, or BreakOut for each row
       dat2 <- categorize(dat)  %.%
-      rename.vars(c('dimension', 'spend', 'conversions', 'cpa'), c(input$dimension, input$spend, input$conversions, 'CPA')) %.%
+      rename.vars(c('dimension', 'spend', 'conversions', 'cpa'), 
+                  c(input$dimension, input$spend, input$conversions, 'CPA')) %.%
         return() 
     }
         
@@ -113,17 +113,27 @@ shinyServer(function(input, output, session) {
         dplyr::summarise(spend = sum(spend), conversions = sum(conversions)) %.%
         transform(cpa = spend/conversions)        
     
-    total_dat <- dplyr::summarise(summary_dat, spend=sum(spend), conversions=sum(conversions))
+    total_dat <- dplyr::summarise(summary_dat, 
+                                  spend = sum(spend), 
+                                  conversions = sum(conversions))
+    
     total_spend <- total_dat$spend[1]
     total_Conv <- total_dat$conversions[1]
-    totals <- data.frame(total_spend = rep(total_spend, nrow(summary_dat)), total_Conv = rep(total_Conv, nrow(summary_dat)))
+    totals <- data.frame(total_spend = rep(total_spend, nrow(summary_dat)), 
+                         total_Conv = rep(total_Conv, nrow(summary_dat)))
     summary_dat <- cbind(summary_dat, totals)
       
-    summary_dat <- mutate(summary_dat, percent.of.spend=spend/total_spend, percent.of.conv=conversions/total_Conv) %.% 
-      mutate(spend=dollar(spend), conversions = comma(conversions), cpa = dollar(cpa)) %.%
-      mutate(percent.of.spend=percent(percent.of.spend), percent.of.conv=percent(percent.of.conv)) %.%
+    summary_dat <- mutate(summary_dat, 
+                          percent.of.spend = spend/total_spend, 
+                          percent.of.conv = conversions/total_Conv) %.% 
+      mutate(spend = dollar(spend), 
+             conversions = comma(conversions), 
+             cpa = dollar(cpa)) %.%
+      mutate(percent.of.spend = percent(percent.of.spend), 
+             percent.of.conv = percent(percent.of.conv)) %.%
       select(classification, spend, conversions, cpa, percent.of.spend, percent.of.conv) %.%
-      rename.vars(c('spend', 'conversions', 'cpa'), c(input$spend, input$conversions, 'CPA')) %.%
+      rename.vars(c('spend', 'conversions', 'cpa', 'percent.of.spend', 'percent.of.conv'), 
+                  c(input$spend, input$conversions, 'CPA', '% Spend', 'Conversions %')) %.%
       return()
       
     }
@@ -154,20 +164,28 @@ shinyServer(function(input, output, session) {
         summary_cpa <- cpa_summary(dat)
         spend <- sum(dat[, input$spend])
         conversions <- sum(dat[, input$conversions])
-        total_cpa <- spend/conversions
-        total <- data.frame(classification="Total", cpa=total_cpa, spend=spend, conversions=conversions)
-        summary_cpa <- rbind(summary_cpa, total)
-        goal_cpa <- data.frame(classification="Goal", cpa=as.numeric(input$goal), spend=NA, conversions=NA)
-        summary_cpa <- rbind(summary_cpa, goal_cpa) %.%
-        rename.vars(c('spend', 'conversions', 'cpa'), c(input$spend, input$conversions, 'CPA'))
         
+        total_cpa <- spend/conversions
+        total <- data.frame(classification = "Total", 
+                            cpa = total_cpa, 
+                            spend = spend, 
+                            conversions = conversions)
+        summary_cpa <- rbind(summary_cpa, total)
+        goal_cpa <- data.frame(classification = "Goal", 
+                               cpa = as.numeric(input$goal), 
+                               spend = NA, 
+                               conversions = NA)
+        summary_cpa <- rbind(summary_cpa, goal_cpa) %.%
+          rename.vars(c('spend', 'conversions', 'cpa'), 
+                      c(input$spend, input$conversions, 'CPA'))
         
         categorized_dat <- categorize(dat) %.%
-        rename.vars(c('dimension','spend', 'conversions', 'cpa'), c(input$dimension, input$spend, input$conversions, 'CPA'))
+        rename.vars(c('dimension','spend', 'conversions', 'cpa'), 
+                    c(input$dimension, input$spend, input$conversions, 'CPA'))
+        
         listData <- plyr::dlply(categorized_dat,
                                 plyr::.(classification))
  
-
         wb <- XLConnect::loadWorkbook(fname, create = T)
         
         XLConnect::createSheet(wb, name = 'Summary')
@@ -217,15 +235,16 @@ shinyServer(function(input, output, session) {
       group_by(classification_cut) %.%
       summarise(spend=sum(spend), conv=sum(conversions))
     ok_cpa <- as.numeric(ok_dat$spend[1] / ok_dat$conv[1])
-    print(ok_cpa)
     
     dat <- transform(dat, numerator_bo = (1/cpa) - (1/ok_cpa),
                      denominator_bo = sqrt((1/ok_cpa)*(1-(1/ok_cpa))/spend)) %.%
       transform(z_bo = numerator_bo / denominator_bo) %.%
       transform(classification_bo = ifelse(1 - pnorm(z_bo) < .05, "Out Performing", "Within Range")) %.%
-      transform(classification = ifelse(classification_cut == "Within Range", ifelse(classification_bo == "Within Range", "Within Range", "Out Performing"), "Under Performing"))
-    
-    
+      transform(classification = ifelse(classification_cut == "Within Range", 
+                                        ifelse(classification_bo == "Within Range", 
+                                               "Within Range", 
+                                               "Out Performing"), 
+                                        "Under Performing"))
 
       dat <- group_by(dat, classification) %.%
       transform(cpa = spend/conversions) %.%
@@ -254,8 +273,12 @@ shinyServer(function(input, output, session) {
 
   # categorize_cpa.chart
   # input: uploaded data stored as variable 'dat' & a goal_Cpa
-  # output: dataframe containing the classification (Within Range, Under Performing, BreakOut) for each row, ,with the assumed goal_cpa
-  # Reason:  Designed for use in plotting the CPA Chart.  Goal_cpa is an input so that we can iterate through
+  # output: dataframe containing the classification 
+      # Within Range, Under Performing, & BreakOut for each row, 
+      # with the assumed goal_cpa
+  # reason:  Designed for use in plotting the CPA Chart.  
+      # goal_cpa is an input so that we can iterate through
+  
   categorize_cpa.chart <- function(dat, goal_cpa) {
     
     spend <- dat[, input$spend]
@@ -275,21 +298,26 @@ shinyServer(function(input, output, session) {
     ok_dat <- filter(dat, classification_cut == "Within Range") %.%
       group_by(classification_cut) %.%
       summarise(spend=sum(spend), conv=sum(conversions))
+    
     ok_cpa <- as.numeric(ok_dat$spend[1] / ok_dat$conv[1])
     
     dat <- transform(dat, numerator_bo = (1/cpa) - (1/ok_cpa),
                      denominator_bo = sqrt((1/ok_cpa)*(1-(1/ok_cpa))/spend)) %.%
       transform(z_bo = numerator_bo / denominator_bo) %.%
-      transform(classification_bo = ifelse(1 - pnorm(z_bo) < .05, "Out Performing", "Within Range")) %.%
-      transform(classification = ifelse(classification_cut == "Within Range", ifelse(classification_bo == "Within Range", "Within Range", "Out Performing"), "Under Performing"))
-    
-    
+      transform(classification_bo = ifelse(1 - pnorm(z_bo) < .05, 
+                                           "Out Performing", 
+                                           "Within Range")) %.%
+      transform(classification = ifelse(classification_cut == "Within Range", 
+                                        ifelse(classification_bo == "Within Range", 
+                                               "Within Range", 
+                                               "Out Performing"), 
+                                        "Under Performing"))
     
     dat <- group_by(dat, classification) %.%
       transform(cpa = spend/conversions) %.%
       select(dimension, conversions, spend, cpa, classification) %.%
       arrange(classification, cpa)
-    #       
+
   } # end categorize_cpa.chart
   
   # conversions chart
@@ -347,9 +375,6 @@ shinyServer(function(input, output, session) {
     convChart$xAxis(title = list(text = 'CPA Decile'))
     convChart$yAxis(title = list(text = input$conversions))
     convChart$xAxis(categories = rownames(pdc))
-    convChart$colors('rgba(34, 131, 0, .85)',
-                     'rgba(158, 0, 22, .85)', 
-                     'rgba(100, 100, 100, .85)')
     convChart$data(pdc)
     convChart$addParams(dom = 'conv_chart')
     convChart$plotOptions(series = list(stacking = 'normal'))
@@ -415,9 +440,6 @@ shinyServer(function(input, output, session) {
     spendChart$xAxis(title = list(text = 'CPA Decile'))
     spendChart$yAxis(title = list(text = input$spend))
     spendChart$xAxis(categories = rownames(pds))
-    spendChart$colors('rgba(34, 131, 0, .85)',
-                      'rgba(158, 0, 22, .85)', 
-                      'rgba(100, 100, 100, .85)')
     spendChart$data(pds)
     spendChart$addParams(dom = 'spend_chart')
     spendChart$plotOptions(series = list(stacking = 'normal'))
@@ -428,7 +450,7 @@ shinyServer(function(input, output, session) {
     
   }) # end of spend chart
   
-  # spend chart
+  # cpa range chart
   output$cpa_range_chart <- renderChart({
     
     infile <- input$datfile
@@ -477,9 +499,6 @@ shinyServer(function(input, output, session) {
     cpa_range_chart$data(df2)
     cpa_range_chart$plotOptions(area = list(stacking = 'normal',
                               marker = list(enabled = F)))
-    cpa_range_chart$colors('rgba(158, 0, 22, .85)', 
-                           'rgba(34, 131, 0, .85)',
-                           'rgba(100, 100, 100, .85)')
     cpa_range_chart$addParams(dom = 'cpa_range_chart')
     cpa_range_chart$tooltip(shared = T,
                             valuePrefix = '$',
@@ -490,7 +509,7 @@ shinyServer(function(input, output, session) {
     return(cpa_range_chart)
 
     
-  }) # end of spend chart
+  }) # end of cpa range chart
   
   
 }) # end ShinyServer
