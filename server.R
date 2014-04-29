@@ -345,6 +345,9 @@ shinyServer(function(input, output, session) {
     convChart$xAxis(title = list(text = 'CPA Decile'))
     convChart$yAxis(title = list(text = input$conversions))
     convChart$xAxis(categories = rownames(pdc))
+    convChart$colors('rgba(34, 131, 0, .85)',
+                     'rgba(158, 0, 22, .85)', 
+                     'rgba(100, 100, 100, .85)')
     convChart$data(pdc)
     convChart$addParams(dom = 'conv_chart')
     convChart$plotOptions(series = list(stacking = 'normal'))
@@ -407,6 +410,9 @@ shinyServer(function(input, output, session) {
     spendChart$xAxis(title = list(text = 'CPA Decile'))
     spendChart$yAxis(title = list(text = input$spend))
     spendChart$xAxis(categories = rownames(pds))
+    spendChart$colors('rgba(34, 131, 0, .85)',
+                      'rgba(158, 0, 22, .85)', 
+                      'rgba(100, 100, 100, .85)')
     spendChart$data(pds)
     spendChart$addParams(dom = 'spend_chart')
     spendChart$plotOptions(series = list(stacking = 'normal'))
@@ -434,29 +440,20 @@ shinyServer(function(input, output, session) {
     
     for(i in 1:(goal_cpa + 100)) {
        dat2 <- categorize_cpa.chart(dat, i) %.%
-#       dat2 <- data.frame(dimension = dimension,
-#                         conversions = conversions,
-#                         spend = spend,
-#                         cpa = cpa) %.%
-#         transform(cpa = 
-#                     ifelse(conversions == 0, 
-#                            max(spend), 
-#                            spend/conversions)) %.%
-#         transform(numerator = (1/cpa) - (1/i),
-#                   denominator = sqrt((1/i)*(1-(1/i))/spend)) %.%
-#         transform(z = numerator/denominator) %.%
-#         transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
         group_by(classification) %.%
         dplyr::summarise(spend = sum(spend),
                          conversions = sum(conversions)) %.%
-        transform(cpa = spend/conversions) %.%
-        dplyr::mutate(goal_cpa = rep(i, n()))
+        transform(cpa = spend/conversions)
+       
+       dat2$goal_cpa <- rep(i, nrow(dat2))
 
       df <- rbind(df, dat2)
     }
     
-    df2 <- select(df, classification, spend, goal_cpa)
-    df2 <- dcast(df2, goal_cpa ~ classification, value.var = 'spend')
+    df2 <- select(df, classification, spend, goal_cpa) %.%
+      filter(!is.na(classification)) %.%
+    dcast(goal_cpa ~ classification, value.var = 'spend')
+    
     row.names(df2) <- df2$goal_cpa
     df2$goal_cpa <- NULL
     
@@ -465,13 +462,16 @@ shinyServer(function(input, output, session) {
     cpa_range_chart$chart(type = 'area')
     cpa_range_chart$yAxis(title = list(text = input$spend))
     cpa_range_chart$xAxis(title = list(text = input$conversions),
-                          plotLines = list(list(color = 'red',
+                          plotLines = list(list(color = 'darkBlue',
                                                         value = goal_cpa,
                                                         width = 3,
                                                         dashStyle = 'longdash')))
     cpa_range_chart$data(df2)
     cpa_range_chart$plotOptions(area = list(stacking = 'normal',
                               marker = list(enabled = F)))
+    cpa_range_chart$colors('rgba(158, 0, 22, .85)', 
+                           'rgba(34, 131, 0, .85)',
+                           'rgba(100, 100, 100, .85)')
     cpa_range_chart$addParams(dom = 'cpa_range_chart')
     cpa_range_chart$tooltip(shared = T,
                             valuePrefix = '$',
