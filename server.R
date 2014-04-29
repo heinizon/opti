@@ -86,7 +86,7 @@ shinyServer(function(input, output, session) {
       
     } else {
       # categorize is a function that returns a dataframe containing
-      # a classification of Cut, OK, or BreakOut for each row
+      # a classification of Poor Performing, OK, or BreakOut for each row
       
         return(categorize(dat)) 
     }
@@ -108,12 +108,21 @@ shinyServer(function(input, output, session) {
       
     dat2 <- categorize(dat)      
       
-        dat2 <- group_by(dat2, classification) %.%
-        dplyr::summarise(spend = sum(spend),
-                         conversions = sum(conversions)) %.%
-        transform(cpa = spend/conversions) %.%
-        mutate(spend=dollar(spend), conversions = comma(conversions), cpa = dollar(cpa)) %.%
-        return()
+        summary_dat <- group_by(dat2, classification) %.%
+        dplyr::summarise(spend = sum(spend), conversions = sum(conversions)) %.%
+        transform(cpa = spend/conversions)        
+    
+    total_dat <- dplyr::summarise(summary_dat, spend=sum(spend), conversions=sum(conversions))
+    total_spend <- total_dat$spend[1]
+    total_Conv <- total_dat$conversions[1]
+    totals <- data.frame(total_spend = rep(total_spend, nrow(summary_dat)), total_Conv = rep(total_Conv, nrow(summary_dat)))
+    summary_dat <- cbind(summary_dat, totals)
+      
+    summary_dat <- mutate(summary_dat, percent.of.spend=spend/total_spend, percent.of.conv=conversions/total_Conv) %.% 
+      mutate(spend=dollar(spend), conversions = comma(conversions), cpa = dollar(cpa)) %.%
+      mutate(percent.of.spend=percent(percent.of.spend), percent.of.conv=percent(percent.of.conv)) %.%
+      select(classification, spend, conversions, cpa, percent.of.spend, percent.of.conv) %.%
+      return()
       
     }
     
@@ -181,7 +190,7 @@ shinyServer(function(input, output, session) {
 
   # categorize
   # input: uploaded data stored as variable 'dat'
-  # output: dataframe containing the classification (OK, Cut, BreakOut) for each row
+  # output: dataframe containing the classification (OK, Poor Performing, BreakOut) for each row
   categorize <- function(dat) {
     goal_cpa <- as.numeric(input$goal)
     
@@ -197,7 +206,7 @@ shinyServer(function(input, output, session) {
     transform(numerator = (1/cpa) - (1/goal_cpa),
               denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
     transform(z = numerator/denominator) %.%
-    transform(classification_cut = ifelse(pnorm(z) < 0.05, 'Cut', 'OK'))
+    transform(classification_cut = ifelse(pnorm(z) < 0.05, 'Poor Performing', 'OK'))
     
     ok_dat <- filter(dat, classification_cut == "OK") %.%
       group_by(classification_cut) %.%
@@ -208,8 +217,8 @@ shinyServer(function(input, output, session) {
     dat <- transform(dat, numerator_bo = (1/cpa) - (1/ok_cpa),
                      denominator_bo = sqrt((1/ok_cpa)*(1-(1/ok_cpa))/spend)) %.%
       transform(z_bo = numerator_bo / denominator_bo) %.%
-      transform(classification_bo = ifelse(1 - pnorm(z_bo) < .05, "Break Out", "OK")) %.%
-      transform(classification = ifelse(classification_cut == "OK", ifelse(classification_bo == "OK", "OK", "Break Out"), "Cut"))
+      transform(classification_bo = ifelse(1 - pnorm(z_bo) < .05, "Strong Performing", "OK")) %.%
+      transform(classification = ifelse(classification_cut == "OK", ifelse(classification_bo == "OK", "OK", "Strong Performing"), "Poor Performing"))
     
     
 
@@ -242,7 +251,7 @@ shinyServer(function(input, output, session) {
 
   # categorize_cpa.chart
   # input: uploaded data stored as variable 'dat' & a goal_Cpa
-  # output: dataframe containing the classification (OK, Cut, BreakOut) for each row, ,with the assumed goal_cpa
+  # output: dataframe containing the classification (OK, Poor Performing, BreakOut) for each row, ,with the assumed goal_cpa
   # Reason:  Designed for use in plotting the CPA Chart.  Goal_cpa is an input so that we can iterate through
   categorize_cpa.chart <- function(dat, goal_cpa) {
     
@@ -258,7 +267,7 @@ shinyServer(function(input, output, session) {
       transform(numerator = (1/cpa) - (1/goal_cpa),
                 denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
       transform(z = numerator/denominator) %.%
-      transform(classification_cut = ifelse(pnorm(z) < 0.05, 'Cut', 'OK'))
+      transform(classification_cut = ifelse(pnorm(z) < 0.05, 'Poor Performing', 'OK'))
     
     ok_dat <- filter(dat, classification_cut == "OK") %.%
       group_by(classification_cut) %.%
@@ -268,8 +277,8 @@ shinyServer(function(input, output, session) {
     dat <- transform(dat, numerator_bo = (1/cpa) - (1/ok_cpa),
                      denominator_bo = sqrt((1/ok_cpa)*(1-(1/ok_cpa))/spend)) %.%
       transform(z_bo = numerator_bo / denominator_bo) %.%
-      transform(classification_bo = ifelse(1 - pnorm(z_bo) < .05, "Break Out", "OK")) %.%
-      transform(classification = ifelse(classification_cut == "OK", ifelse(classification_bo == "OK", "OK", "Break Out"), "Cut"))
+      transform(classification_bo = ifelse(1 - pnorm(z_bo) < .05, "Strong Performing", "OK")) %.%
+      transform(classification = ifelse(classification_cut == "OK", ifelse(classification_bo == "OK", "OK", "Strong Performing"), "Poor Performing"))
     
     
     
