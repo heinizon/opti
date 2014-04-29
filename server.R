@@ -142,7 +142,7 @@ shinyServer(function(input, output, session) {
         categorized_dat <- categorize(dat)
        
         listData <- plyr::dlply(categorized_dat,
-                                plyr::.(Classification))
+                                plyr::.(classification))
  
 
         wb <- XLConnect::loadWorkbook(fname, create = T)
@@ -221,44 +221,74 @@ shinyServer(function(input, output, session) {
     dimension <- dat[, input$dimension]
     cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
     
-    datt <- data.frame(spend = spend,
-                      conversions = conversions,
-                      dimension = dimension,
-                      cpa = cpa) %.%
-      transform(numerator = (1/cpa) - (1/goal_cpa),
-                denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
-      transform(z = numerator/denominator) %.%
-      transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
-      group_by(classification) %.%
-      transform(cpa = spend/conversions) %.%
-      select(dimension, conversions, spend, cpa, classification) %.%
-      arrange(classification, cpa) %.%
+    datt <- categorize(dat) %.%  
       group_by(classification) %.%
       dplyr::summarise(cpa = sum(spend)/sum(conversions),
                        spend = sum(spend),
                        conversions = sum(conversions))
-    
-    cut_cpa <- datt[which(datt$classification == 'Cut'), 2]
-    ok_cpa <- datt[which(datt$classification == 'OK'), 2]
-    avg_cpa <- sum(spend)/sum(conversions)
-    
-    cut_spend <- datt[which(datt$classification == 'Cut'), 3]
-    ok_spend <- datt[which(datt$classification == 'OK'), 3]
-    all_spend <- sum(spend)
-    
-    cut_conversions <- datt[which(datt$classification == 'Cut'), 4]
-    ok_conversions <- datt[which(datt$classification == 'OK'), 4]
-    all_conversions <- sum(conversions)
-    
-    cpa_summary <- data.frame(
-      Group = c('OK', 'Cut', 'Total/Avg', 'Goal'),
-      CPA = c(ok_cpa, cut_cpa, avg_cpa, goal_cpa),
-      spend = c(ok_spend, cut_spend, all_spend, NA),
-      conversions = c(ok_conversions, cut_conversions, all_conversions, NA)) %.%
-      rename.vars(c('spend', 'conversions'),
-                  c(input$spend, input$conversions))
+    #######NEeD to UPDATE Code HEre#######
+#     cut_cpa <- datt[which(datt$classification == 'Cut'), 2]
+#     ok_cpa <- datt[which(datt$classification == 'OK'), 2]
+#     avg_cpa <- sum(spend)/sum(conversions)
+#     
+#     cut_spend <- datt[which(datt$classification == 'Cut'), 3]
+#     ok_spend <- datt[which(datt$classification == 'OK'), 3]
+#     all_spend <- sum(spend)
+#     
+#     cut_conversions <- datt[which(datt$classification == 'Cut'), 4]
+#     ok_conversions <- datt[which(datt$classification == 'OK'), 4]
+#     all_conversions <- sum(conversions)
+#     
+#     cpa_summary <- data.frame(
+#       Group = c('OK', 'Cut', 'Total/Avg', 'Goal'),
+#       CPA = c(ok_cpa, cut_cpa, avg_cpa, goal_cpa),
+#       spend = c(ok_spend, cut_spend, all_spend, NA),
+#       conversions = c(ok_conversions, cut_conversions, all_conversions, NA)) %.%
+#       rename.vars(c('spend', 'conversions'),
+#                   c(input$spend, input$conversions))
 
   }
+
+  # categorize_cpa.chart
+  # input: uploaded data stored as variable 'dat' & a goal_Cpa
+  # output: dataframe containing the classification (OK, Cut, BreakOut) for each row, ,with the assumed goal_cpa
+  # Reason:  Designed for use in plotting the CPA Chart.  Goal_cpa is an input so that we can iterate through
+  categorize_cpa.chart <- function(dat, goal_cpa) {
+    
+    spend <- dat[, input$spend]
+    conversions <- dat[, input$conversions]
+    dimension <- dat[, input$dimension]
+    cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
+    
+    dat <- data.frame(spend = dat[, input$spend],
+                      conversions = dat[, input$conversions],
+                      dimension = dat[, input$dimension],
+                      cpa = cpa) %.%
+      transform(numerator = (1/cpa) - (1/goal_cpa),
+                denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
+      transform(z = numerator/denominator) %.%
+      transform(classification_cut = ifelse(pnorm(z) < 0.05, 'Cut', 'OK'))
+    
+    ok_dat <- filter(dat, classification_cut == "OK") %.%
+      group_by(classification_cut) %.%
+      summarise(spend=sum(spend), conv=sum(conversions))
+    ok_cpa <- as.numeric(ok_dat$spend[1] / ok_dat$conv[1])
+    print(ok_cpa)
+    
+    dat <- transform(dat, numerator_bo = (1/cpa) - (1/ok_cpa),
+                     denominator_bo = sqrt((1/ok_cpa)*(1-(1/ok_cpa))/spend)) %.%
+      transform(z_bo = numerator_bo / denominator_bo) %.%
+      transform(classification_bo = ifelse(1 - pnorm(z_bo) < .05, "Break Out", "OK")) %.%
+      transform(classification = ifelse(classification_cut == "OK", ifelse(classification_bo == "OK", "OK", "Break Out"), "Cut"))
+    
+    
+    
+    dat <- group_by(dat, classification) %.%
+      transform(cpa = spend/conversions) %.%
+      select(dimension, conversions, spend, cpa, classification) %.%
+      arrange(classification, cpa)
+    #       
+  } # end categorize_cpa.chart
   
   # conversions chart
   output$conv_chart <- renderChart({
@@ -276,18 +306,7 @@ shinyServer(function(input, output, session) {
     dimension <- dat[, input$dimension]
     cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
     
-    dat <- data.frame(spend = spend,
-                      conversions = conversions,
-                      dimension = dimension,
-                      cpa = cpa) %.%
-      transform(numerator = (1/cpa) - (1/goal_cpa),
-                denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
-      transform(z = numerator/denominator) %.%
-      transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
-      group_by(classification) %.%
-      transform(cpa = spend/conversions) %.%
-      select(dimension, conversions, spend, cpa, classification) %.%
-      arrange(classification, cpa)
+    dat <- categorize(dat)
     
     CPA <- as.numeric(paste(dat$cpa))
     CPA <- 
@@ -349,18 +368,7 @@ shinyServer(function(input, output, session) {
     dimension <- dat[, input$dimension]
     cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
     
-    dat <- data.frame(spend = spend,
-                      conversions = conversions,
-                      dimension = dimension,
-                      cpa = cpa) %.%
-      transform(numerator = (1/cpa) - (1/goal_cpa),
-                denominator = sqrt((1/goal_cpa)*(1-(1/goal_cpa))/spend)) %.%
-      transform(z = numerator/denominator) %.%
-      transform(classification = ifelse(pnorm(z) < 0.05, 'Cut', 'OK')) %.%
-      group_by(classification) %.%
-      transform(cpa = spend/conversions) %.%
-      select(dimension, conversions, spend, cpa, classification) %.%
-      arrange(classification, cpa)
+    dat <- categorize(dat)
     
     CPA <- as.numeric(paste(dat$cpa))
     CPA <- 
@@ -423,9 +431,10 @@ shinyServer(function(input, output, session) {
     cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
     
     df <- data.frame()
+    
     for(i in 1:(goal_cpa + 100)) {
-      
-      dat <- data.frame(dimension = dimension,
+#         dat2 <- categorize_cpa.chart(dat, goal_cpa) %.%
+      dat2 <- data.frame(dimension = dimension,
                         conversions = conversions,
                         spend = spend,
                         cpa = cpa) %.%
@@ -442,8 +451,8 @@ shinyServer(function(input, output, session) {
                          conversions = sum(conversions)) %.%
         transform(cpa = spend/conversions) %.%
         mutate(goal_cpa = rep(i, 2))
-      
-      df <- rbind(df, dat)
+
+      df <- rbind(df, dat2)
     }
     
     df2 <- select(df, classification, spend, goal_cpa)
