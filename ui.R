@@ -48,12 +48,16 @@ shinyUI(pageWithSidebar(
       ),
       
       tabPanel('Analysis',
-               tableOutput('analysis')
+               HTML('<br><center>'),
+               tableOutput('analysis'),
+               HTML('</center>')
       ),
       
       tabPanel('Summary',
                showOutput("cpa_range_chart", "Highcharts"),
-               tableOutput('classification_summary')
+               HTML('<br><center>'),
+               tableOutput('classification_summary'),
+               HTML('</center>')
       ),
       
       tabPanel('Spend & Conv Chart',
