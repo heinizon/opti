@@ -272,11 +272,11 @@ shinyServer(function(input, output, session) {
   }
 
   # categorize_cpa.chart
-  # input: uploaded data stored as variable 'dat' & a goal_Cpa
+  # input: uploaded data stored as variable 'dat' & a goal_cpa
   # output: dataframe containing the classification 
       # Within Range, Under Performing, & BreakOut for each row, 
       # with the assumed goal_cpa
-  # reason:  Designed for use in plotting the CPA Chart.  
+  # reason:  Designed for use in plotting the cpa Chart
       # goal_cpa is an input so that we can iterate through
   
   categorize_cpa.chart <- function(dat, goal_cpa) {
@@ -415,6 +415,7 @@ shinyServer(function(input, output, session) {
                            jitter(i), 
                            i))
     }
+    
     dat$CPA <- cpa
     dat$group <- cut(dat$CPA, 
                      breaks = quantile(dat$CPA, 
@@ -460,32 +461,28 @@ shinyServer(function(input, output, session) {
       return(NULL)
     
     goal_cpa <- as.numeric(input$goal)
+    goal_cpa_times2 <- goal_cpa * 2
     
-    spend <- dat[, input$spend]
-    conversions <- dat[, input$conversions]
-    dimension <- dat[, input$dimension]
-    cpa <- ifelse(conversions == 0, max(spend), spend/conversions)
+    cpa_iterations <- data.frame()
     
-    df <- data.frame()
-    
-    for(i in 1:(goal_cpa + 100)) {
-       dat2 <- categorize_cpa.chart(dat, i) %.%
+    for(i in 1:(goal_cpa_times2)) {
+      cpa_iteration <- categorize_cpa.chart(dat, i) %.%
         group_by(classification) %.%
         dplyr::summarise(spend = sum(spend),
                          conversions = sum(conversions)) %.%
         transform(cpa = spend/conversions)
        
-       dat2$goal_cpa <- rep(i, nrow(dat2))
+       cpa_iteration$goal_cpa <- rep(i, nrow(cpa_iteration))
 
-      df <- rbind(df, dat2)
+      cpa_iterations <- rbind(cpa_iterations, cpa_iteration)
     }
     
-    df2 <- select(df, classification, spend, goal_cpa) %.%
-    filter(!is.na(classification)) %.%
-    dcast(goal_cpa ~ classification, value.var = 'spend')
+    cpa_iterations_casted <- select(cpa_iterations, classification, spend, goal_cpa) %.%
+      filter(!is.na(classification)) %.%
+      dcast(goal_cpa ~ classification, value.var = 'spend')
 
-    row.names(df2) <- df2$goal_cpa
-    df2$goal_cpa <- NULL
+    row.names(cpa_iterations_casted) <- cpa_iterations_casted$goal_cpa
+    cpa_iterations_casted$goal_cpa <- NULL
     
     # highcharts
     cpa_range_chart <- Highcharts$new()
@@ -496,7 +493,7 @@ shinyServer(function(input, output, session) {
                                                 value = goal_cpa,
                                                         width = 3,
                                                         dashStyle = 'longdash')))
-    cpa_range_chart$data(df2)
+    cpa_range_chart$data(cpa_iterations_casted)
     cpa_range_chart$plotOptions(area = list(stacking = 'normal',
                               marker = list(enabled = F)))
     cpa_range_chart$addParams(dom = 'cpa_range_chart')
@@ -504,8 +501,8 @@ shinyServer(function(input, output, session) {
                             valuePrefix = '$',
                             valueDecimals = 0)
     cpa_range_chart$colors('rgba(158, 0, 22, .85)',
-                            'rgba(34, 131, 0, .85)', 
-                            'rgba(100, 100, 100, .85)')
+                           'rgba(34, 131, 0, .85)', 
+                           'rgba(100, 100, 100, .85)')
     return(cpa_range_chart)
 
     
