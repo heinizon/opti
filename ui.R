@@ -29,12 +29,19 @@ shinyUI(pageWithSidebar(
   
   # goal input
   sidebarPanel(
-    h3(textInput('goal', 'Please enter the goal CPA: ', '')),
-    selectInput('dimension', 'Dimension:' ,'Dimension'),
-    selectInput('conversions', 'Conversions:', 'Conversions'),
-    selectInput('spend', 'Spend:', 'Spend'),
-    HTML('<br>'),
-    downloadButton('downloadAnalysis', "Download Analysis")
+    wellPanel(
+      h3(textInput('goal', 'Please enter the goal CPA: ', '')),
+      selectInput('dimension', 'Dimension:' ,'Dimension'),
+      selectInput('conversions', 'Conversions:', 'Conversions'),
+      selectInput('spend', 'Spend:', 'Spend'),
+      HTML('<br>'),
+      downloadButton('downloadAnalysis', "Download Analysis")
+    ),
+    wellPanel(
+      HTML('<center><h3>CPA Summary</h3><br>'),
+      tableOutput('ui_cpa_summary'),
+      HTML('</center>')
+    )
   ),
   
   mainPanel(
@@ -60,7 +67,7 @@ shinyUI(pageWithSidebar(
                HTML('</center>')
       ),
       
-      tabPanel('Spend & Conv Chart',
+      tabPanel('Charts',
                showOutput("spend_chart", "Highcharts"),
                showOutput("conv_chart", "Highcharts")
       )
