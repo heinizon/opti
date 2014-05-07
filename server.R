@@ -287,10 +287,12 @@ shinyServer(function(input, output, session) {
     dimension <- dat[, input$dimension]
     cpa <- spend/conversions
     
+    avg_cpa <- sum(spend)/sum(conversions)
+    
     data.frame(
-      Dimension = c('Average CPA (w/o Inf)', 'Median CPA', 
-                    'Min CPA', 'Max CPA', 'Max (w/o Inf)'),
-      CPA = c(mean(cpa[is.finite(cpa)]), median(cpa), 
+      Dimension = c('Average CPA', 'Median CPA', 
+                    'Min CPA', 'Max CPA', 'Max CPA (w/o Inf)'),
+      CPA = c(avg_cpa, median(cpa), 
               min(cpa), max(cpa), max(cpa[is.finite(cpa)]))
       )
   
